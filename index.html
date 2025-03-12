@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OpenAI Real-time Audio Demo</title>
+    <title>Drive Through Order Assistant</title>
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
           integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
@@ -17,13 +17,10 @@
         <div class="header">
             <div class="logo">
                 <svg viewBox="0 0 24 24" class="app-logo" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M19.5 8.25L12 12.75L4.5 8.25M12 21.75L12 12.75M12 2.25L19.5 6.75L12 11.25L4.5 6.75L12 2.25Z" 
-                          stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-                    <path d="M12 21.75L19.5 17.25L19.5 8.25M12 21.75L4.5 17.25L4.5 8.25" 
-                          stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M4 6H20M4 12H20M4 18H20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                 </svg>
             </div>
-            <h1>OpenAI Realtime Audio Demo</h1>
+            <h1>Drive-Thru Order Assistant</h1>
         </div>
         
         <div class="controls">
@@ -45,17 +42,18 @@
         <div class="content-wrapper">
             <div class="transcript-container">
                 <div id="transcript" class="transcript">
-                    <!-- Conversation content -->
+                    <!-- Order conversation content -->
                 </div>
             </div>
             <div class="side-container">
                 <div class="image-container" id="imageContainer">
-                    <!-- Image placeholder for testing -->
-                    <div class="image-placeholder">Image will appear here</div>
+                    <h2>Order Summary</h2>
+                    <div id="orderDetails" class="order-details">
+                        <!-- Order details will be displayed here -->
+                    </div>
                 </div>
-                <div id="map" class="map-container">
-                    <!-- Map placeholder for testing -->
-                    <div class="map-placeholder">Map will appear here</div>
+                <div id="map" class="total-container">
+                    <div id="totalAmount" class="total-amount">Total: $0.00</div>
                 </div>
             </div>
         </div>

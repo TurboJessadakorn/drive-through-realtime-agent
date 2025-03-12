@@ -1,3 +1,8 @@
+const state = {
+    orders: [],  // Stores the list of orders
+    total: 0     // Stores the total cost of all orders
+};
+
 // UI Management
 class UI {
     static elements = {
@@ -9,7 +14,9 @@ class UI {
         status: document.getElementById('status'),
         error: document.getElementById('error'),
         imageContainer: document.getElementById('imageContainer'),
-        contentWrapper: document.querySelector('.content-wrapper')
+        contentWrapper: document.querySelector('.content-wrapper'),
+        orderDetails: document.getElementById('orderDetails'),
+        totalAmount: document.getElementById('totalAmount')
     };
 
     static updateStatus(message) {
@@ -39,14 +46,16 @@ class UI {
 
     static clearConversation() {
         this.elements.transcript.innerHTML = '';
-        this.elements.imageContainer.innerHTML = '';
-        this.elements.contentWrapper.classList.remove('with-image');
         this.hideError();
+        state.orders = [];
+        state.total = 0;
+        this.clearOrderSummary();
         this.updateStatus('Ready to start');
-        if (map) {
-            map.remove();
-            map = null;
-        }
+    }
+
+    static clearOrderSummary() {
+        this.elements.orderDetails.innerHTML = '';
+        this.elements.totalAmount.textContent = 'Total: $0.00';
     }
 
     static updateButtons(isConnected) {
@@ -54,57 +63,20 @@ class UI {
         this.elements.stopButton.disabled = !isConnected;
     }
 
-    static displayImage(imageUrl, imageSource, query) {
-        const sideContainer = document.querySelector('.side-container');
-        const imageContainer = this.elements.imageContainer;
-        
-        if (!imageUrl) {
-            imageContainer.innerHTML = '';
-            this.elements.contentWrapper.classList.remove('with-image');
-            // Recenter map after layout changes
-            if (map) {
-                setTimeout(() => {
-                    map.invalidateSize();
-                    const center = map.getCenter();
-                    map.setView(center, map.getZoom());
-                }, 100);
-            }
-            return;
-        }
+    static updateOrderSummary() {
+        // Clear current summary
+        this.clearOrderSummary();
 
-        this.elements.contentWrapper.classList.add('with-image');
-        const imageWrapper = document.createElement('div');
-        imageWrapper.className = 'image-wrapper';
-        
-        const img = document.createElement('img');
-        img.className = 'search-image';
-        img.alt = query;
-        
-        const loadingDiv = document.createElement('div');
-        loadingDiv.textContent = 'Loading image...';
-        loadingDiv.className = 'image-loading';
-        imageWrapper.appendChild(loadingDiv);
-        
-        img.onload = () => {
-            loadingDiv.remove();
-            imageWrapper.appendChild(img);
-            const caption = document.createElement('div');
-            caption.className = 'image-caption';
-            caption.innerHTML = `
-                Image related to: ${query}<br>
-                <a href="${imageSource}" target="_blank">Image source</a>
-            `;
-            imageWrapper.appendChild(caption);
-        };
-        
-        img.onerror = () => {
-            loadingDiv.textContent = 'Failed to load image';
-            loadingDiv.className = 'image-error';
-        };
-        
-        img.src = imageUrl;
-        imageContainer.innerHTML = '';
-        imageContainer.appendChild(imageWrapper);
+        // Re-render the orders in state
+        state.orders.forEach(orderItem => {
+            const orderDiv = document.createElement('div');
+            orderDiv.className = 'order-item';
+            orderDiv.textContent = `${orderItem.quantity} x ${orderItem.name} - $${(orderItem.price * orderItem.quantity).toFixed(2)}`;
+            this.elements.orderDetails.appendChild(orderDiv);
+        });
+
+        // Update the total
+        this.elements.totalAmount.textContent = `Total: $${state.total.toFixed(2)}`;
     }
 
     static updateVoiceSelector(enabled) {
@@ -129,135 +101,137 @@ class MessageHandler {
         }
     }
 
-    static async handleWeatherFunction(output) {
+    static async handleOrderFunction(output) {
         try {
             const args = JSON.parse(output.arguments);
-            const response = await fetch(`${CONFIG.API_ENDPOINTS.weather}/${encodeURIComponent(args.location)}`);
-            const data = await response.json();
-            
-            // Format the current weather information
-            const currentWeather = `Current Weather in ${args.location}:
-${CONFIG.WEATHER_ICONS[data.weather_code] || '🌡️'} ${data.temperature}°${data.unit_temperature}
-• Humidity: ${data.humidity}%
-• Precipitation: ${data.precipitation}${data.unit_precipitation}
-• Wind Speed: ${data.wind_speed}${data.unit_wind}`.trim();
-
-            // Format the forecast information
-            const forecast = data.forecast_daily.map(day => 
-                `${new Date(day.date).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}:
-${CONFIG.WEATHER_ICONS[day.weather_code] || '🌡️'} High: ${day.max_temp}°${data.unit_temperature}
-• Low: ${day.min_temp}°${data.unit_temperature}
-• Precipitation: ${day.precipitation}${data.unit_precipitation}`.trim()
-            ).join('\n\n');
-            
-            const messageDiv = document.createElement('div');
-            messageDiv.className = 'message function-result weather';
-            
-            // Add current weather
-            const currentWeatherDiv = document.createElement('div');
-            currentWeatherDiv.textContent = currentWeather;
-            messageDiv.appendChild(currentWeatherDiv);
-            
-            // Add forecast toggle button
-            const toggleButton = document.createElement('button');
-            toggleButton.className = 'forecast-toggle';
-            toggleButton.textContent = '7-Day Forecast';
-            messageDiv.appendChild(toggleButton);
-            
-            // Add forecast content (hidden by default)
-            const forecastDiv = document.createElement('div');
-            forecastDiv.className = 'forecast-content';
-            forecastDiv.textContent = forecast;
-            messageDiv.appendChild(forecastDiv);
-            
-            // Add click handler for toggle
-            toggleButton.addEventListener('click', () => {
-                toggleButton.classList.toggle('expanded');
-                forecastDiv.classList.toggle('expanded');
+        
+            const response = await fetch(`${CONFIG.API_ENDPOINTS.order}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ order: args.order, quantity: args.quantity })
             });
-            
-            if (UI.elements.transcript.firstChild) {
-                UI.elements.transcript.insertBefore(messageDiv, UI.elements.transcript.firstChild);
-            } else {
-                UI.elements.transcript.appendChild(messageDiv);
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.error || "Failed to place order");
             }
-            
-            if (data.latitude && data.longitude) {
-                updateMap(data.latitude, data.longitude, data.location_name);
-            }
-            
+            const orderItem = {
+                name: data.name,
+                quantity: data.quantity,
+                price: data.price
+            };
+
+            state.orders.push(orderItem);
+            state.total += orderItem.price * orderItem.quantity;
+            UI.updateOrderSummary();
+
             return {
-                temperature: data.temperature,
-                humidity: data.humidity,
-                precipitation: data.precipitation,
-                wind_speed: data.wind_speed,
-                forecast_daily: data.forecast_daily,
-                current_time: data.current_time,
-                location: args.location,
-                latitude: data.latitude,
-                longitude: data.longitude,
-                location_name: data.location_name
+                message: `Added ${orderItem.quantity} x ${orderItem.name} to order.`,
+                orderItem
             };
         } catch (error) {
-            ErrorHandler.handle(error, 'Weather Function');
-            return "Could not get weather data";
+            ErrorHandler.handle(error, 'Order Function');
+            if (error.message.includes("not found in menu")) {
+                return `Error: ${error.message}`;
+            }
+            return "Could not process order";
         }
     }
 
-    static async handleSearchFunction(output) {
+    static async handleRemoveOrderFunction(output) {
         try {
             const args = JSON.parse(output.arguments);
-            const response = await fetch(`${CONFIG.API_ENDPOINTS.search}/${encodeURIComponent(args.query)}`);
-            const data = await response.json();
+            const { order, quantity } = args;
             
-            const messageDiv = document.createElement('div');
-            messageDiv.className = 'message function-result search';
-            
-            const titleDiv = document.createElement('div');
-            titleDiv.className = 'result-title';
-            const titleLink = document.createElement('a');
-            titleLink.href = data.source;
-            titleLink.target = '_blank';
-            titleLink.rel = 'noopener noreferrer';
-            titleLink.textContent = data.title;
-            titleDiv.appendChild(titleLink);
-            
-            const snippetDiv = document.createElement('div');
-            snippetDiv.className = 'result-snippet';
-            snippetDiv.textContent = data.snippet;
-            
-            const sourceDiv = document.createElement('div');
-            sourceDiv.className = 'result-source';
-            const sourceLink = document.createElement('a');
-            sourceLink.href = data.source;
-            sourceLink.target = '_blank';
-            sourceLink.rel = 'noopener noreferrer';
-            sourceLink.textContent = data.source;
-            sourceDiv.appendChild(sourceLink);
-            
-            messageDiv.appendChild(titleDiv);
-            messageDiv.appendChild(snippetDiv);
-            messageDiv.appendChild(sourceDiv);
-            
-            if (UI.elements.transcript.firstChild) {
-                UI.elements.transcript.insertBefore(messageDiv, UI.elements.transcript.firstChild);
+            const orderItemIndex = state.orders.findIndex(item => item.name === args.order);
+            if (orderItemIndex === -1) {
+                return {
+                    message: `Item '${order}' not found in current order.`
+                };
+            }
+
+            const orderItem = state.orders[orderItemIndex];
+
+            // If requested quantity is less than the ordered quantity, adjust it
+            if (orderItem.quantity >= quantity) {
+                orderItem.quantity -= quantity;
+                state.total -= orderItem.price * quantity;
+                UI.updateOrderSummary();
+
+                return {
+                    message: `Reduced quantity of ${orderItem.name} by ${quantity}.`,
+                    orderItem
+                };
             } else {
-                UI.elements.transcript.appendChild(messageDiv);
+                state.orders.splice(orderItemIndex, 1);
+                state.total -= orderItem.price * orderItem.quantity;
+                UI.updateOrderSummary();
+
+                return {
+                    message: `Removed all of ${orderItem.name} from the order.`,
+                    orderItem
+                };
             }
             
-            UI.displayImage(data.image_url, data.image_source, args.query);
-            
-            return {
-                title: data.title,
-                snippet: data.snippet,
-                source: data.source,
-                image_url: data.image_url,
-                image_source: data.image_source
-            };
         } catch (error) {
-            ErrorHandler.handle(error, 'Search Function');
-            return "Could not perform search";
+            ErrorHandler.handle(error, 'Remove Order Function');
+            return "Could not remove item from order";
         }
+    }
+
+    static async handleGetMenuDetailsFunction(output) {
+        try {
+            const args = JSON.parse(output.arguments);
+            const response = await fetch(`${CONFIG.API_ENDPOINTS.menu}/${encodeURIComponent(args.menu)}`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            });
+
+            const data = await response.json();
+            if (response.ok) {
+                return {
+                    message: `Menu details retrieved successfully.`,
+                    menuDetails: data
+                };
+            } else {
+                return {
+                    message: `Failed to retrieve menu details.`,
+                    error: data.error
+                };
+            }
+        } catch (error) {
+            ErrorHandler.handle(error, 'Get Menu Details Function');
+            return "Could not fetch menu details";
+        }
+    }
+
+    static async handleSummarizeOrder() {
+        if (state.orders.length === 0) {
+            return { message: "Your order is currently empty." };
+        }
+
+        let summary = "Your order summary:\n";
+        state.orders.forEach(order => {
+            summary += `- ${order.quantity} x ${order.name} ($${(order.price * order.quantity).toFixed(2)})\n`;
+        });
+
+        summary += `Total: $${state.total.toFixed(2)}`;
+
+        return { message: summary };
+    }
+
+    static async handleFinalizeOrder() {
+        if (state.orders.length === 0) {
+            return { message: "No items in order to finalize." };
+        }
+        const finalOrder = state.orders.map(order => `${order.quantity} x ${order.name}`).join(", ");
+        const totalPrice = state.total.toFixed(2);
+
+
+        return { message: `Your order has been finalized: ${finalOrder}. Total: $${totalPrice}. Please proceed to payment.` };
     }
 }
 
@@ -295,11 +269,18 @@ class WebRTCManager {
                 await MessageHandler.handleTranscript(message);
                 const output = message.response?.output?.[0];
                 if (output?.type === 'function_call' && output?.call_id) {
+                    console.log("Call Function: ", output.name)
                     let result;
-                    if (output.name === 'get_weather') {
-                        result = await MessageHandler.handleWeatherFunction(output);
-                    } else if (output.name === 'search_web') {
-                        result = await MessageHandler.handleSearchFunction(output);
+                    if (output.name === 'take_order') {
+                        result = await MessageHandler.handleOrderFunction(output);
+                    } else if (output.name === 'remove_order') {
+                        result = await MessageHandler.handleRemoveOrderFunction(output);
+                    } else if (output.name === 'get_menu_details') {
+                        result = await MessageHandler.handleGetMenuDetailsFunction(output);
+                    } else if (output.name === 'summarize_order') {
+                        result = await MessageHandler.handleSummarizeOrder(output);
+                    } else if (output.name === 'finalize_order') {
+                        result = await MessageHandler.handleFinalizeOrder(output);
                     }
                     
                     if (result) {
@@ -481,35 +462,6 @@ class App {
         UI.updateVoiceSelector(true);
         UI.updateStatus('Ready to start');
     }
-}
-
-let map = null;
-
-function updateMap(latitude, longitude, locationName) {
-    if (!map) {
-        map = L.map('map').setView([latitude, longitude], 10);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap contributors'
-        }).addTo(map);
-    } else {
-        map.setView([latitude, longitude], 10);
-        map.eachLayer((layer) => {
-            if (layer instanceof L.Marker) {
-                map.removeLayer(layer);
-            }
-        });
-    }
-    
-    L.marker([latitude, longitude])
-        .addTo(map)
-        .bindPopup(locationName)
-        .openPopup();
-
-    // Force map to recalculate its container size
-    setTimeout(() => {
-        map.invalidateSize();
-        map.setView([latitude, longitude], 10);
-    }, 100);
 }
 
 // Initialize the application

@@ -1,71 +1,94 @@
 const CONFIG = {
     API_ENDPOINTS: {
         session: 'http://localhost:8888/session',
-        weather: 'http://localhost:8888/weather',
-        search: 'http://localhost:8888/search',
+        order: 'http://localhost:8888/order',
+        menu: 'http://localhost:8888/menu',
         realtime: 'https://api.openai.com/v1/realtime'
-        // realtime: 'https://oai-swe-demo.openai.azure.com/realtime'
     },
     MODEL: 'gpt-4o-realtime-preview-2024-12-17',
     VOICE: 'echo',
     VOICES: ['alloy', 'ash', 'ballad', 'coral', 'echo', 'sage', 'shimmer', 'verse'],
     INITIAL_MESSAGE: {
-        text: 'My name is Geert and I live in Antwerp, Belgium.'
+        text: 'Welcome to our drive-thru! What can I get for you today?'
     },
-    TOOLS: [{
-        type: 'function',
-        name: 'get_weather',
-        description: 'Get current weather and 7-day forecast for any location on Earth. Includes temperature, humidity, precipitation, and wind speed.',
-        parameters: {
-            type: 'object',
-            description: 'The location to get the weather for in English',
-            properties: {
-                location: { 
-                    type: 'string',
-                    description: 'The city or location name to get weather for'
-                }
-            },
-            required: ['location']
+    TOOLS: [
+        {
+            type: 'function',
+            name: 'take_order',
+            description: 'Records a customer\'s order',
+            parameters: {
+                type: 'object',
+                properties: {
+                    order: {
+                        type: 'string',
+                        enum: ["burger", "fries", "nuggets", "coke"],
+                        description: 'The customer\'s order in natural language'
+                    },
+                    quantity: {
+                        type: 'integer',
+                        description: 'The quantity of the ordered item',
+                        default: 1
+                    }
+                },
+                required: ['order', 'quantity']
+            }
+        },
+        {
+            type: 'function',
+            name: 'remove_order',
+            description: 'Removes a selected item from the customer\'s order',
+            parameters: {
+                type: 'object',
+                properties: {
+                    order: {
+                        type: 'string',
+                        description: 'The name of the item to remove from the order'
+                    },
+                    quantity: {
+                        type: 'integer',
+                        description: 'The quantity of the item to remove'
+                    }
+                },
+                required: ['order']
+            }
+        },
+        {
+            type: 'function',
+            name: 'get_menu_details',
+            description: 'Fetches details about a specific menu',
+            parameters: {
+                type: 'object',
+                properties: {
+                    menu: {
+                        type: 'string',
+                        enum: ["burger", "fries", "nuggets", "coke"],
+                        description: 'The name of the menu to get details for'
+                    }
+                },
+                required: ['menu']
+            }
+        },
+        {
+            type: 'function',
+            name: 'summarize_order',
+            description: 'Summarizes the current order, listing all items and total cost. Only call this function when the user explicitly requests an order summary.',
+            parameters: {
+                type: 'object',
+                properties: {},
+                required: []
+            }
+        },
+        {
+            type: 'function',
+            name: 'finalize_order',
+            description: 'Finalizes the order when the customer is ready to checkout',
+            parameters: {
+                type: 'object',
+                properties: {},
+                required: []
+            }
         }
-    },
-    {
-        type: 'function',
-        name: 'search_web',
-        description: 'Search the web for current information about any topic',
-        parameters: {
-            type: 'object',
-            properties: {
-                query: { type: 'string' }
-            },
-            required: ['query']
-        }
-    }],
-    WEATHER_ICONS: {
-        0: "☀️", // Clear sky
-        1: "🌤️", // Mainly clear
-        2: "⛅", // Partly cloudy
-        3: "☁️", // Overcast
-        45: "🌫️", // Foggy
-        48: "🌫️", // Depositing rime fog
-        51: "🌦️", // Light drizzle
-        53: "🌦️", // Moderate drizzle
-        55: "🌧️", // Dense drizzle
-        61: "🌧️", // Slight rain
-        63: "🌧️", // Moderate rain
-        65: "🌧️", // Heavy rain
-        71: "🌨️", // Slight snow
-        73: "🌨️", // Moderate snow
-        75: "🌨️", // Heavy snow
-        77: "🌨️", // Snow grains
-        80: "🌦️", // Slight rain showers
-        81: "🌧️", // Moderate rain showers
-        82: "🌧️", // Violent rain showers
-        85: "🌨️", // Slight snow showers
-        86: "🌨️", // Heavy snow showers
-        95: "⛈️", // Thunderstorm
-        96: "⛈️", // Thunderstorm with slight hail
-        99: "⛈️", // Thunderstorm with heavy hail
-    },
+    ]
 };
 
-window.CONFIG = CONFIG; 
+window.CONFIG = CONFIG;
